@@ -122,7 +122,7 @@ def parallel_stuff(n_bits, real_bits, m_bits, val_n = None, val_thresh = None):
     level = m_bits - 1
     outputs = level_add(inputs[:-1], 3)
     count_1s = val_n.count(1)
-    maj = int(n_bits/2) + 1 <= count_1s
+    maj = int(real_bits/2) + 1 <= count_1s # Higher bit count circuit can be used for smaller operation with a different threshold
    
     if val_n is not None:
         print('//', end='')
@@ -150,10 +150,17 @@ def parallel_stuff(n_bits, real_bits, m_bits, val_n = None, val_thresh = None):
     output.set_wire_val(fin_output[-1])
     print_footer()
 
+# when bits = circ_bits,  maj_count - 1 is the counter_val (eg: 7 -> counter val is 3, 15 -> counter val is 7)
+# when bits < circ_bits,  2*circ_bits - maj_count - 1 is the counter val ( eg 15 circ maj 7 -> counter val = 2*4 - 4 - 1 = 11)
 bits = 7
 circ_bits = 7
 counter_bits = 3
-counter_val = [1,1,0]
+counter_val = [1,1,0] 
+
+# bits = 7
+# circ_bits = 15
+# counter_bits = 4
+# counter_val = [1,1,0,1] 
 
 for i in range(2**bits):
     val = bin(i)
@@ -162,6 +169,6 @@ for i in range(2**bits):
     q = [int(v_n) for v_n in v]
     print(f'// maj_res {i} , {q}')
     # q = [0, 0, 0, 0, 0, 0, 1]
-    parallel_stuff(circ_bits, counter_bits, q, counter_val)
+    parallel_stuff(circ_bits, bits, counter_bits, q, counter_val)
 
     
