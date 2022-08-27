@@ -96,16 +96,22 @@ def level_add(inputs, level):
 
 def compare(outputs, comp_val, last_bit, level):
     print('\n// comparison adders')
+    # import pdb; pdb.set_trace()
     return this_level_add(outputs, comp_val, last_bit, level)
 
-
-def parallel_stuff(n_bits, m_bits):
+passing = 0
+def parallel_stuff(n_bits, real_bits, m_bits, val_n = None, val_thresh = None):
+    global passing
     # n_bits = 15, m_bits = 4 + 1
     depth = m_bits 
+    if val_n is None:
+        val_n = [0 for i in range(n_bits)]
+    if val_thresh is None:
+        val_thresh = [0 for j in range(m_bits)]
     print('\n')
-    inputs = [Wire(f'x{i}') for i in range(n_bits)] + [Wire('l1', 0)]
+    inputs = [Wire(f'x{i}', val_n[i]) for i in range(n_bits)] + [Wire('l1', 1)]
     print('\n')
-    comp_val = [Wire(f't{i}') for i in range(m_bits)]
+    comp_val = [Wire(f't{i}', val_thresh[i]) for i in range(m_bits)]
     output = Wire(f'out_maj_{n_bits}')
     print('\n')
 
@@ -115,10 +121,47 @@ def parallel_stuff(n_bits, m_bits):
     adder_tree = []
     level = m_bits - 1
     outputs = level_add(inputs[:-1], 3)
+    count_1s = val_n.count(1)
+    maj = int(n_bits/2) + 1 <= count_1s
+   
+    if val_n is not None:
+        print('//', end='')
+        count_circ = 0
+        for i,o in enumerate(outputs):
+            print(f" {o.val}", end = '')
+            count_circ = count_circ + (o.val * 2**i)
+        print()
+        print(f'// maj_res {count_1s} {maj} {count_circ}')
+        
     fin_output = compare(outputs, comp_val, inputs[-1], level+1)
+    if val_n is not None:
+        print(f'//{len(outputs)}', end='')
+        for o in fin_output:
+            print(f" {o.val}", end = '')
+        print()
+        maj_circ = (fin_output[-1].val == 1)
+        if maj_circ == maj:
+            passing = passing + 1
+        print(f'// maj_res {fin_output[-1].val}| {maj_circ} | {maj} -> {passing}')
+        
+        assert maj_circ == maj , 'Invalid output'
+        
+        
     output.set_wire_val(fin_output[-1])
     print_footer()
-    
-parallel_stuff(15, 4)
+
+bits = 7
+circ_bits = 7
+counter_bits = 3
+counter_val = [1,1,0]
+
+for i in range(2**bits):
+    val = bin(i)
+    v = str(val)[2:]
+    v = '0'*(circ_bits-len(v)) + v
+    q = [int(v_n) for v_n in v]
+    print(f'// maj_res {i} , {q}')
+    # q = [0, 0, 0, 0, 0, 0, 1]
+    parallel_stuff(circ_bits, counter_bits, q, counter_val)
 
     
