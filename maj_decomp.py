@@ -192,10 +192,10 @@ if __name__ == "__main__":
     # m_s2= Sum('s2')
     # s1,cout1 = m_s2.comp(s, cout, d)
 
-    ## when bits = circ_bits,  maj_count - 1 is the counter_val (eg: 7 -> counter val is 3, 15 -> counter val is 7)
-    ## when bits < circ_bits,  2*circ_bits - maj_count - 1 is the counter val ( eg 15 circ maj 7 -> counter val = 2*4 - 4 - 1 = 11)
-    bits = 7
-    circ_bits = 7
+    
+    ## when  2*counter_bits - maj_count - 1 is the counter val ( eg 15 circ maj 7 -> counter val = 2*4 - 4 - 1 = 11)
+    bits = 7 # the number of bits majority function 
+    circ_bits = 7 # the number of bits the circuit is created for
     counter_bits = 3
     counter_val = [1,1,0] 
 
