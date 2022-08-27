@@ -36,22 +36,20 @@ class Sum:
 
         return self.sum, self.c_out
         
-def print_header(inputs, comp_val, out):
+def print_header(input_var, n_bits, thresh_var, m_bits, const_var, output_var):
     global module_file, enable_file_write
-    h = f'// Module to compute majority with {len(inputs)-1} bits \n'
-    h = h + f'// Created on {datetime.datetime.now()} \n'
-    h = h + 'module Maj(\n'
-    for i in inputs[:-1]:
-        h += f'\tinput {i.name}, \n'
-    
-    for i in comp_val:
-        h += f'\tinput {i.name}, \n'
-    
-    h = h + f'\toutput {out.name});\n'
-
-    h = h + f'wire {inputs[-1].name};\n'
-    h = h + f'assign {inputs[-1].name} = 1;\n'
     if enable_file_write:
+        h = f'// Module to compute majority with {n_bits} bits \n'
+        h = h + f'// Created on {datetime.datetime.now()} \n'
+        h = h + f'module Maj{n_bits}(\n'
+        h = h + f'input [{n_bits}:0] {input_var},\n'
+        h = h + f'input [{m_bits}:0] {thresh_var},\n'
+        h = h + f'output {output_var});\n'
+        
+
+        h = h + f'wire {const_var};\n'
+        h = h + f'assign {const_var} = 1;\n'
+    
         module_file.write(h)
 
 def print_footer():
@@ -111,15 +109,18 @@ def parallel_stuff(n_bits, real_bits, m_bits, val_n = None, val_thresh = None):
         val_n = [0 for i in range(n_bits)]
     if val_thresh is None:
         val_thresh = [0 for j in range(m_bits)]
+    input_var = "xin"
+    thresh_var = "th"
+    output_var = f"out_maj_{n_bits}"
+    const_var = 'const1'
+    inputs = [Wire(f'{input_var}[{i}]', val_n[i]) for i in range(n_bits)] + [Wire(const_var, 1)]
     
-    inputs = [Wire(f'x{i}', val_n[i]) for i in range(n_bits)] + [Wire('l1', 1)]
-    
-    comp_val = [Wire(f't{i}', val_thresh[i]) for i in range(m_bits)]
-    output = Wire(f'out_maj_{n_bits}')
+    comp_val = [Wire(f'{thresh_var}[{i}]', val_thresh[i]) for i in range(m_bits)]
+    output = Wire(output_var)
     
     if module_file is not None:
         enable_file_write = True
-        print_header(inputs, comp_val, output)
+        print_header(input_var, n_bits, thresh_var, m_bits, const_var, output_var)
 
     # create all the adders! 
     adder_tree = []
@@ -154,6 +155,33 @@ def parallel_stuff(n_bits, real_bits, m_bits, val_n = None, val_thresh = None):
     output.set_wire_val(fin_output[-1])
     print_footer()
 
+def generate_tb(bits, circ_bits, counter_bits, counter_val, test_count=None):
+    # generates a test bench for Maj_bits checking on a circuit with Maj_circ_bits implementation
+    f = open(f'stim_M{bits}_{circ_bits}.v', 'w')
+    h = '`timescale 1ns / 1ps\n\n'
+    h = h + f'module stim_M{bits}_{circ_bits}; \n// Inputs/Outputs \nreg [{circ_bits}:0] xin;\n reg [{counter_bits}:0] th;\n wire out;\n '
+    h = h + '// instantiate DUT\n'
+    h = h + f'Maj{circ_bits} dut( .xin(xin), .th(th), .out_maj_{circ_bits}(out));\n'
+
+    h = h + 'initial begin \n'
+    # drive the inputs 
+    h = h + f'th = {counter_val};\n'
+    h = h + f'xin = 0;\n\n'
+    if (test_count == None):
+        test_count = 2**bits 
+    
+    for i in range(2**bits):
+        h = h + f'#10 xin = {i};\n'
+    
+    h = h + 'end\n\n'
+
+    h = h + 'initial begin \n $monitor("t=%3d xin=%2b,th=%2b,maj=%d\\n",$time,xin,th,out);\n end\n'
+
+    h = h + 'endmodule\n'
+    f.write(h)
+    f.close()
+
+
 if __name__ == "__main__":
     ## test wires and sum
     # a, b, c = Wire('a', 1), Wire('b', 1), Wire('c', 0)
@@ -177,19 +205,21 @@ if __name__ == "__main__":
     # counter_bits = 4
     # counter_val = [1,1,0,1] 
 
-    # this is for testing correctness
-    for i in range(2**bits):
-        val = bin(i)
-        v = str(val)[2:]
-        v = '0'*(circ_bits-len(v)) + v
-        q = [int(v_n) for v_n in v]
-        print(f'// maj_res {i} , {q}')
-        # q = [0, 0, 0, 0, 0, 0, 1]
-        parallel_stuff(circ_bits, bits, counter_bits, q, counter_val)
+    ## this is for testing correctness
+    # for i in range(2**bits):
+    #     val = bin(i)
+    #     v = str(val)[2:]
+    #     v = '0'*(circ_bits-len(v)) + v
+    #     q = [int(v_n) for v_n in v]
+    #     print(f'// maj_res {i} , {q}')
+    #     # q = [0, 0, 0, 0, 0, 0, 1]
+    #     parallel_stuff(circ_bits, bits, counter_bits, q, counter_val)
 
-    # this is to generate the module
-    # module_file = open(f'maj_{circ_bits}.v', 'w')
-    # parallel_stuff(circ_bits, bits, counter_bits)
+    ## this is to generate the module
+    module_file = open(f'maj_{circ_bits}.v', 'w')
+    parallel_stuff(circ_bits, bits, counter_bits)
+    int_counter_val = sum([val*(2**i) for i,val in enumerate(counter_val)]
+    generate_tb(bits, circ_bits, counter_bits, int_counter_val, test_count=None)
 
 
     
