@@ -55,13 +55,14 @@ def print_header(input_var, n_bits, thresh_var, m_bits, const_var, output_var):
     
         module_file.write(h)
     
-def print_specialized_header(input_var, n_bits, thresh_var, m_bits, thresh_val, const_var, output_var):
+def print_specialized_header(input_var, n_bits, real_bits, thresh_var, m_bits, thresh_val, const_var, output_var):
     '''
     Print the header for a specialized majority implementation. This can be used only
     for the specific Maj m_bits computation.
     Args:
         input_var (string|list): Input variable (either a list for bits or a single value if it is a bit-vector)
         n_bits (int): Number of bits for the threshold circuit
+        real_bits (int): Actual number of bits implementing majority! (real_bits <= n_bits)
         thresh_var (string|list): Threshold variable (either a list for bits or a single value if it is a bit-vector)
         m_bits (int): Number of bits for the majority circuit
         thresh_val (int|list): Counter value (either an int or a list of bits)
@@ -70,11 +71,11 @@ def print_specialized_header(input_var, n_bits, thresh_var, m_bits, thresh_val, 
     '''
     global module_file, enable_file_write
     if enable_file_write:
-        h = f'// Module to compute majority with {n_bits} bits \n'
+        h = f'// Module to compute majority with {real_bits} bits \n'
         h = h + f'// Created on {datetime.datetime.now()} \n'
-        h = h + f'module Maj{n_bits}(\n'
+        h = h + f'module Maj{real_bits}(\n'
         if type(input_var) == list:
-            for i in input_var:
+            for i in input_var[:real_bits]:
                 h = h + f'{i},\n'
         else:
             h = h + f' [{n_bits}:0] {input_var},\n'
@@ -83,13 +84,21 @@ def print_specialized_header(input_var, n_bits, thresh_var, m_bits, thresh_val, 
         # print the inputs here!
         h = h + 'input '
         if type(input_var) == list:
-            for i in input_var:
+            for i in input_var[:real_bits]:
                 h = h + f' {i},'
         else:
             h = h + f' input [{n_bits}:0] {input_var},'
+        
+        
+
         h = h[:-1] + ';\n'
         h = h + f'output {output_var};\n'
 
+        
+        if type(input_var) == list and n_bits > real_bits:
+            h = h + '// unused inputs from the threshold circuit'
+            for i in input_var[real_bits-1:]:
+                h = h + f'wire {i}; assign {i} = 0;\n'
 
         
         if type(thresh_var) == list:
@@ -167,7 +176,7 @@ def parallel_stuff(n_bits, real_bits, m_bits, specialize = False, val_n = None, 
         val_n (list): List of binary values of the input 
         val_thresh (int): Counter value
     '''
-    global module_file, enable_file_write
+    global module_file, enable_file_write, adder_index
     global passing
     # n_bits = 15, m_bits = 4 + 1
     depth = m_bits 
@@ -184,7 +193,14 @@ def parallel_stuff(n_bits, real_bits, m_bits, specialize = False, val_n = None, 
         input_var = "xin"
         inputs = [Wire(f'{input_var}[{i}]', val_n[i]) for i in range(n_bits)] + [Wire(const_var, 1)]
     else:
-        inputs = [Wire(f'{chr(97+i)}', val_n[i]) for i in range(n_bits)] + [Wire(const_var, 1)]
+        inputs = []
+        prefix = 'x'
+        for i in range(n_bits):
+            if i < 26:
+                inputs.append(Wire(f'{chr(97+i)}', val_n[i]))
+            else:
+                inputs.append(Wire(f'x{i}', val_n[i]))
+        inputs = inputs + [Wire(const_var, 1)]
         input_wires = [t.name for t in inputs[:-1]]
     
     thresh_var = "th"
@@ -199,7 +215,7 @@ def parallel_stuff(n_bits, real_bits, m_bits, specialize = False, val_n = None, 
         enable_file_write = True
 
         if specialize:
-            print_specialized_header(input_wires, n_bits, thresh_wires, m_bits, val_thresh, const_var, output_var)
+            print_specialized_header(input_wires, n_bits, real_bits, thresh_wires, m_bits, val_thresh, const_var, output_var)
         else:
             print_header(input_var, n_bits, thresh_var, m_bits, const_var, output_var)
 
@@ -235,6 +251,7 @@ def parallel_stuff(n_bits, real_bits, m_bits, specialize = False, val_n = None, 
         
     output.set_wire_val(fin_output[-1])
     print_footer()
+    return adder_index
 
 def generate_tb(bits, circ_bits, counter_bits, counter_val, test_count=None):
     # generates a test bench for Maj_bits checking on a circuit with Maj_circ_bits implementation
@@ -261,6 +278,7 @@ def generate_tb(bits, circ_bits, counter_bits, counter_val, test_count=None):
     h = h + 'endmodule\n'
     f.write(h)
     f.close()
+    
 
 def verify_with_abc(bits, gen_file_name):
 
@@ -289,15 +307,25 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--check_abc", action="store_true", help="Generate ABC commands to verify", default=False)
     args = parser.parse_args()
     
+    # circ_bits is always 2*n - 1
+    check_bits = args.maj_bits + 1
+    if (check_bits & (check_bits-1) == 0) and check_bits != 0:
+        circ_bits = args.maj_bits # the number of bits the circuit is created for
+    else:
+        circ_bits = 2**(int(math.log2(args.maj_bits))+1) - 1
     bits = args.maj_bits # the number of bits majority function 
-    circ_bits = args.maj_bits # the number of bits the circuit is created for
+    
     counter_bits = int(math.log2(circ_bits + 1))
-    counter_val = [int(i) for i in list(str(bin(2**counter_bits - int(bits/2 + 1) - 1))[2:])] 
+    cval = 2**counter_bits - (int(bits/2) + 1) - 1
+    counter_val = [int(i) for i in list(str(bin(cval))[2:])] 
+    counter_val.reverse()
     counter_val = counter_val + [0 for i in range(counter_bits - len(counter_val))]
     specialize = True
     gen_file_name = f'maj_{bits}.v'
+    
     module_file = open(gen_file_name, 'w')
-    parallel_stuff(circ_bits, bits, counter_bits, specialize, None, counter_val)
+    adder_count = parallel_stuff(circ_bits, bits, counter_bits, specialize, None, counter_val)
+    print(f'circ_bits: {circ_bits},real_bits: {bits},counter_bits: {counter_bits},counter val:{cval},adders:{adder_count}')
     if args.check_abc:
         verify_with_abc(bits, gen_file_name)
 
