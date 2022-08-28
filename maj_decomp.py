@@ -3,6 +3,8 @@
 import datetime 
 import subprocess 
 import sys 
+import math
+import argparse
 
 module_file = None 
 enable_file_write = False
@@ -262,26 +264,43 @@ def generate_tb(bits, circ_bits, counter_bits, counter_val, test_count=None):
 
 def verify_with_abc(bits, gen_file_name):
 
-    abc_command = 'abc -c "symfun '
+    abc_command = 'symfun '
     sym_out = ''
     for i in range(bits+1):
         if i < int(bits/2)+1:
             sym_out = sym_out + '0'
         else:
             sym_out = sym_out + '1'
-    abc_command = abc_command + sym_out 
-    print(sym_out)
-    abc_command = abc_command + f'; st; clp; muxes; st; ps; write_verilog m{bits}.v; cec -n m{bits}.v {gen_file_name};"'
-    print(abc_command)
-    output,error  = subprocess.Popen(
-                    abc_command, universal_newlines=True,
-                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True).communicate()
-    print(output)
+    abc_command = abc_command + sym_out + '\n'
+    abc_command = abc_command + f'st\n clp\n muxes\n st\n ps\n write_verilog m{bits}.v\n cec -n m{bits}.v {gen_file_name}\nquit\n'
+    
+    with open('abc_script.txt', 'w') as f:
+        f.write(abc_command)
+    # p = subprocess.Popen('abc -F abc_script.txt', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    # print(p.communicate())
+    # # print('error', error)
 
 
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("maj_bits", type=int, help="Number of bits for majority")
+    parser.add_argument("-c", "--check_abc", action="store_true", help="Generate ABC commands to verify", default=False)
+    args = parser.parse_args()
+    
+    bits = args.maj_bits # the number of bits majority function 
+    circ_bits = args.maj_bits # the number of bits the circuit is created for
+    counter_bits = int(math.log2(circ_bits + 1))
+    counter_val = [int(i) for i in list(str(bin(2**counter_bits - int(bits/2 + 1) - 1))[2:])] 
+    counter_val = counter_val + [0 for i in range(counter_bits - len(counter_val))]
+    specialize = True
+    gen_file_name = f'maj_{bits}.v'
+    module_file = open(gen_file_name, 'w')
+    parallel_stuff(circ_bits, bits, counter_bits, specialize, None, counter_val)
+    if args.check_abc:
+        verify_with_abc(bits, gen_file_name)
+
     ## test wires and sum
     # a, b, c = Wire('a', 1), Wire('b', 1), Wire('c', 0)
     # m_s1= Sum('s1')
@@ -292,37 +311,40 @@ if __name__ == "__main__":
     # s1,cout1 = m_s2.comp(s, cout, d)
 
     
-    ## when  2*counter_bits - maj_count - 1 is the counter val ( eg 15 circ maj 7 -> counter val = 2*4 - 4 - 1 = 11)
-    bits = 15 # the number of bits majority function 
-    circ_bits = 15 # the number of bits the circuit is created for
-    counter_bits = 4
-    counter_val = [1,1,1,0] 
-    specialize = True
-
-    # bits = 7
-    # circ_bits = 15
-    # counter_bits = 4
-    # counter_val = [1,1,0,1] 
+    # ## when  2*counter_bits - maj_count - 1 is the counter val ( eg 15 circ maj 7 -> counter val = 2*4 - 4 - 1 = 11)
+    # bits = 7 # the number of bits majority function 
+    # circ_bits = 7 # the number of bits the circuit is created for
+    # counter_bits = int(math.log2(circ_bits + 1))
+    # counter_val = [int(i) for i in list(str(bin(2**counter_bits - int(bits/2 + 1) - 1))[2:])] 
+    # counter_val = counter_val + [0 for i in range(counter_bits - len(counter_val))]
     # specialize = True
 
-    ## this is for testing correctness
-    # for i in range(2**bits):
-    #     val = bin(i)
-    #     v = str(val)[2:]
-    #     v = '0'*(circ_bits-len(v)) + v
-    #     q = [int(v_n) for v_n in v]
-    #     print(f'// maj_res {i} , {q}')
-    #     # q = [0, 0, 0, 0, 0, 0, 1]
-    #     parallel_stuff(circ_bits, bits, counter_bits, specialize q, counter_val)
+    # print(counter_bits, counter_val)
 
-    ## this is to generate the module
-    gen_file_name = f'maj_{bits}.v'
-    module_file = open(gen_file_name, 'w')
-    parallel_stuff(circ_bits, bits, counter_bits, specialize, None, counter_val)
-    int_counter_val = sum([val*(2**i) for i,val in enumerate(counter_val)])
-    generate_tb(bits, circ_bits, counter_bits, int_counter_val, test_count=None)
+    # # bits = 7
+    # # circ_bits = 15
+    # # counter_bits = 4
+    # # counter_val = [1,1,0,1] 
+    # # specialize = True
 
-    verify_with_abc(bits, gen_file_name)
+    # ## this is for testing correctness
+    # # for i in range(2**bits):
+    # #     val = bin(i)
+    # #     v = str(val)[2:]
+    # #     v = '0'*(circ_bits-len(v)) + v
+    # #     q = [int(v_n) for v_n in v]
+    # #     print(f'// maj_res {i} , {q}')
+    # #     # q = [0, 0, 0, 0, 0, 0, 1]
+    # #     parallel_stuff(circ_bits, bits, counter_bits, specialize q, counter_val)
+
+    # ## this is to generate the module
+    # gen_file_name = f'maj_{bits}.v'
+    # module_file = open(gen_file_name, 'w')
+    # parallel_stuff(circ_bits, bits, counter_bits, specialize, None, counter_val)
+    # # int_counter_val = sum([val*(2**i) for i,val in enumerate(counter_val)])
+    # # generate_tb(bits, circ_bits, counter_bits, int_counter_val, test_count=None)
+
+    # verify_with_abc(bits, gen_file_name)
 
 
     
