@@ -8,6 +8,7 @@ import argparse
 
 module_file = None 
 enable_file_write = False
+
 class Wire:
     def __init__(self, name, val=0):
         global module_file, enable_file_write
@@ -292,7 +293,7 @@ def verify_with_abc(bits, gen_file_name):
     abc_command = abc_command + sym_out + '\n'
     abc_command = abc_command + f'st\n clp\n muxes\n st\n ps\n write_verilog m{bits}.v\n cec -n m{bits}.v {gen_file_name}\nquit\n'
     
-    with open('abc_script.txt', 'w') as f:
+    with open(gen_file_name, 'w') as f:
         f.write(abc_command)
     # p = subprocess.Popen('abc -F abc_script.txt', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     # print(p.communicate())
@@ -300,8 +301,7 @@ def verify_with_abc(bits, gen_file_name):
 
 
 
-
-if __name__ == "__main__":
+if __name__ == "__main__": # pragma: no cover
     parser = argparse.ArgumentParser()
     parser.add_argument("maj_bits", type=int, help="Number of bits for majority")
     parser.add_argument("-c", "--check_abc", action="store_true", help="Generate ABC commands to verify", default=False)
