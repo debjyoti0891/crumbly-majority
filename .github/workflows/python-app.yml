@@ -36,7 +36,7 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
     - name: Test with pytest
       run: |
-        cov_res=`pytest --cov=maj_decomp | grep TOTAL |  awk '{print $NF}'` &&  echo "COVERAGE={cov_res%?}" >> $GITHUB_ENV$
+        cov_res=`pytest --cov=maj_decomp | grep TOTAL |  awk '{print $NF}'` &&  echo "COVERAGE=${cov_res%?}" >> $GITHUB_ENV$
     - name: Create Awesome Badge
       uses: schneegans/dynamic-badges-action@v1.4.0
       with:
