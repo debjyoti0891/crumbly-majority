@@ -1,0 +1,7 @@
+*_pycache_*
+*html
+*js
+*json
+*coverage
+*vscode*
+*pytest_cache*
