@@ -1,8 +1,4 @@
-
-# Online Python - IDE, Editor, Compiler, Interpreter
 import datetime 
-import subprocess 
-import sys 
 import math
 import argparse
 
@@ -19,7 +15,8 @@ class Wire:
     def set_wire_val(self, another_wire):
         global module_file, enable_file_write
         self.val = another_wire.val 
-        if enable_file_write: module_file.write(f'assign {self.name} = {another_wire.name};\n')
+        if enable_file_write:
+            module_file.write(f'assign {self.name} = {another_wire.name};\n')
     
     def set_computed_val(self, value):
         self.val = value 
@@ -40,6 +37,7 @@ class Sum:
 
         return self.sum, self.c_out
         
+
 def print_header(input_var, n_bits, thresh_var, m_bits, const_var, output_var):
     global module_file, enable_file_write
     if enable_file_write:
@@ -56,6 +54,7 @@ def print_header(input_var, n_bits, thresh_var, m_bits, const_var, output_var):
     
         module_file.write(h)
     
+
 def print_specialized_header(input_var, n_bits, real_bits, thresh_var, m_bits, thresh_val, const_var, output_var):
     '''
     Print the header for a specialized majority implementation. This can be used only
@@ -116,10 +115,12 @@ def print_specialized_header(input_var, n_bits, real_bits, thresh_var, m_bits, t
     
         module_file.write(h)
 
+
 def print_footer():
     global module_file, enable_file_write
     if enable_file_write:
         module_file.write('endmodule')
+
 
 adder_index = 0
 def this_level_add(o0, o1, bit, level):
@@ -142,6 +143,7 @@ def this_level_add(o0, o1, bit, level):
     out.append(carry)
     return out
 
+
 def level_add(inputs, level):
     global module_file, enable_file_write
     # print(f'level: {level} | len: {len(inputs)}')
@@ -157,11 +159,13 @@ def level_add(inputs, level):
         if enable_file_write: module_file.write(f'\n\n// Level {level} adders\n')
         return this_level_add(output_0, output_1, inputs[-1], level)
 
+
 def compare(outputs, comp_val, last_bit, level):
     global module_file, enable_file_write
     if enable_file_write: module_file.write('\n// comparison adders\n')
     # import pdb; pdb.set_trace()
     return this_level_add(outputs, comp_val, last_bit, level)
+
 
 passing = 0
 def parallel_stuff(n_bits, real_bits, m_bits, specialize = False, val_n = None, val_thresh = None):
@@ -186,7 +190,7 @@ def parallel_stuff(n_bits, real_bits, m_bits, specialize = False, val_n = None, 
     if val_thresh is None:
         val_thresh = [0 for j in range(m_bits)]
     
-    output_var = f"F0"
+    output_var = "F0"
     output = Wire(output_var)
     const_var = 'const1'
 
@@ -209,9 +213,8 @@ def parallel_stuff(n_bits, real_bits, m_bits, specialize = False, val_n = None, 
         comp_val = [Wire(f'{thresh_var}[{i}]', val_thresh[i]) for i in range(m_bits)]
     else:
         comp_val = [Wire(f'{thresh_var}{i}', val_thresh[i]) for i in range(m_bits)]
-        thresh_wires = [t.name for t in comp_val]
-    
-    
+        thresh_wires = [t.name for t in comp_val]    
+
     if module_file is not None:
         enable_file_write = True
 
@@ -247,12 +250,13 @@ def parallel_stuff(n_bits, real_bits, m_bits, specialize = False, val_n = None, 
             passing = passing + 1
         print(f'// maj_res {fin_output[-1].val}| {maj_circ} | {maj} -> {passing}')
         
-        assert maj_circ == maj , 'Invalid output'
+        assert maj_circ == maj, 'Invalid output'
         
         
     output.set_wire_val(fin_output[-1])
     print_footer()
     return adder_index
+
 
 def generate_tb(bits, circ_bits, counter_bits, counter_val, test_count=None):
     # generates a test bench for Maj_bits checking on a circuit with Maj_circ_bits implementation
@@ -298,7 +302,6 @@ def verify_with_abc(bits, gen_file_name):
     # p = subprocess.Popen('abc -F abc_script.txt', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     # print(p.communicate())
     # # print('error', error)
-
 
 
 if __name__ == "__main__": # pragma: no cover
@@ -373,6 +376,3 @@ if __name__ == "__main__": # pragma: no cover
     # # generate_tb(bits, circ_bits, counter_bits, int_counter_val, test_count=None)
 
     # verify_with_abc(bits, gen_file_name)
-
-
-    
