@@ -46,7 +46,7 @@ jobs:
         gistID: 9a1ad1634bdd899b73fd5c9463d428ca
         filename: md_coverage.json
         label: Coverage
-        message:  ${{ env.ANSWER }}
+        message: is ${{ env.ANSWER }}
         valColorRange: ${{ env.ANSWER }}
         maxColorRange: 100
         minColorRange: 0
