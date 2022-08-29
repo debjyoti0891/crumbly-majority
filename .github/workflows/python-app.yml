@@ -38,7 +38,7 @@ jobs:
       run: |
         cov_res=`pytest --cov=maj_decomp | grep TOTAL |  awk '{print $NF}'` 
         export COV=${cov_res%?} 
-        echo "ANSWER=${COV}" >> $GITHUB_ENV$
+        echo "ANSWER=${COV}" >> $GITHUB_ENV
         echo "ANSWER=${COV}" 
     - name: Create Awesome Badge
       uses: schneegans/dynamic-badges-action@v1.4.0
