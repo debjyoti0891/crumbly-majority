@@ -1,6 +1,7 @@
 import datetime 
 import math
 import argparse
+import os
 
 module_file = None 
 enable_file_write = False
@@ -31,6 +32,11 @@ class Sum:
         global module_file, enable_file_write
         self.sum.set_computed_val(a.val ^ b.val ^ c.val)
         self.c_out.set_computed_val((a.val & b.val) | ( c.val & (a.val ^ b.val)))
+
+        for v in [a.name, b.name, c.name]:
+            print(f'{v} ', end='')
+        print(f'-> {self.sum.name} {self.c_out.name}')
+        
         if enable_file_write: 
             module_file.write(f"assign {self.sum.name} = {a.name} ^ {b.name} ^ {c.name}; ")
             module_file.write(f"assign {self.c_out.name} = (({a.name} & {b.name}) | ( {c.name} & ({a.name} ^ {b.name})));\n")
@@ -86,6 +92,7 @@ def print_specialized_header(input_var, n_bits, real_bits, thresh_var, m_bits, t
         if type(input_var) == list:
             for i in input_var[:real_bits]:
                 h = h + f' {i},'
+                print(f'node {i} [label = {i}]')
         else:
             h = h + f' input [{n_bits}:0] {input_var},'
         
@@ -96,15 +103,17 @@ def print_specialized_header(input_var, n_bits, real_bits, thresh_var, m_bits, t
 
         
         if type(input_var) == list and n_bits > real_bits:
-            h = h + '// unused inputs from the threshold circuit'
-            for i in input_var[real_bits-1:]:
+            h = h + f'// unused inputs from the threshold circuit (with {n_bits})\n'
+            for i in input_var[real_bits:]:
                 h = h + f'wire {i}; assign {i} = 0;\n'
+                print(f'node {i} [label = 0]')
 
         
         if type(thresh_var) == list:
             for i, v in enumerate(thresh_var):
                 h = h + f'wire {v};\n'
                 h = h + f'assign {v} = {thresh_val[i]};\n'
+                print(f'node {v} [label = {thresh_val[i]}]')
         else:
             h = h + f'wire [{m_bits}:0] {thresh_var};\n'
             assert type(thresh_val) == int, "Threshold value {thresh_val}should be int"
@@ -252,7 +261,7 @@ def parallel_stuff(n_bits, real_bits, m_bits, specialize = False, val_n = None, 
         
         assert maj_circ == maj, 'Invalid output'
         
-        
+    print(f"{fin_output[-1].name} = {output.name};") 
     output.set_wire_val(fin_output[-1])
     print_footer()
     return adder_index
@@ -303,11 +312,43 @@ def verify_with_abc(bits, gen_file_name):
     # print(p.communicate())
     # # print('error', error)
 
+def dump_rewrite(in_file):
+    all_str = ''
+    head = ''
+    body = ''
+    
+    with open(in_file) as f:
+        state = 0
+        for l in f:
+            if state == 0:
+                head = head + l 
+                if 'output ' in l:
+                    state = 1
+                    continue
+            
+            if state == 1:
+                if 'wire ' in l:
+                    w_s = l.find('wire')
+                    w_sub = l[w_s : ]
+                    w_e = w_sub.find(';')
+                    rest = l[:w_s] + w_sub[w_e+1:]
+                    body = body + rest 
+                    all_str = all_str + w_sub[w_s:w_e+1] + '\n'
+                else:
+                    body = body + l 
+
+    with open(in_file, 'w') as f:
+        f.write(head + all_str + body)
+
+
+            
+        
 
 if __name__ == "__main__": # pragma: no cover
     parser = argparse.ArgumentParser()
     parser.add_argument("maj_bits", type=int, help="Number of bits for majority")
     parser.add_argument("-c", "--check_abc", action="store_true", help="Generate ABC commands to verify", default=False)
+    parser.add_argument("-o", "--output_dir", help="Location of the output directory")
     args = parser.parse_args()
     
     # circ_bits is always 2*n - 1
@@ -324,13 +365,24 @@ if __name__ == "__main__": # pragma: no cover
     counter_val.reverse()
     counter_val = counter_val + [0 for i in range(counter_bits - len(counter_val))]
     specialize = True
-    gen_file_name = f'maj_{bits}.v'
+    if args.output_dir is not None:
+        if not os.path.isdir(args.output_dir):
+            os.mkdir(args.output_dir)
+        out_dir = args.output_dir
+        if out_dir[:-1] != '/':
+            out_dir = out_dir + '/'
+    else:
+        out_dir = './'
+    gen_file_name = f'{out_dir}maj_{bits}.v'
     
     module_file = open(gen_file_name, 'w')
     adder_count = parallel_stuff(circ_bits, bits, counter_bits, specialize, None, counter_val)
-    print(f'circ_bits: {circ_bits},real_bits: {bits},counter_bits: {counter_bits},counter val:{cval},adders:{adder_count}')
+    module_file.close()
+    print(f'//circ_bits: {circ_bits},real_bits: {bits},counter_bits: {counter_bits},counter val:{cval},adders:{adder_count}')
     if args.check_abc:
         verify_with_abc(bits, gen_file_name)
+
+    dump_rewrite(gen_file_name)
 
     ## test wires and sum
     # a, b, c = Wire('a', 1), Wire('b', 1), Wire('c', 0)
